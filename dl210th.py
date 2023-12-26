@@ -306,6 +306,11 @@ class Dl210Th(object):
         _check_response(response, length=40, prefix=[35])
         return OwnerStartTime.parse(response[1:])
 
+    def get_location(self):
+        response = self._connection.run_command(36)
+        _check_response(response, length=33, prefix=[36])
+        return response[1:]
+
 
 def set_time(dl):
     s = dl.cmd4()
