@@ -228,6 +228,19 @@ class Settings4(_BinaryRecord):
         _Byte("unk27")]
 
 
+class Measurement(_BinaryRecord):
+    _fields = [
+        _Word("temperature100"),
+        _Word("humidity100")]
+
+
+def _check_response(response, length=None, prefix=None):
+    if length is not None and len(response) != length:
+        raise DlError("expected %d bytes, got %d" % (length, len(response)))
+    if prefix is not None and not response.startswith(bytes(prefix)):
+        raise DlError("invalid response start: %s" % response[0:len(prefix)])
+
+
 class Dl210Th(object):
     def __init__(self, c):
         self._connection = c
@@ -255,6 +268,11 @@ class Dl210Th(object):
         if response[0:3] != bytes([0, 0, 4]):
             raise DlError("invalid three first bytes: %s" % response[0:3])
         return Settings4.parse(response[3:])
+
+    def read_sensors(self):
+        response = self._connection.run_command(6)
+        _check_response(response, length=7, prefix=[0, 0, 6])
+        return Measurement.parse(response[3:])
 
     def get_settings33(self):
         response = self._connection.run_command(33)
