@@ -136,11 +136,17 @@ class _DlHidConnection:
     def __init__(self, dev):
         self._dev = dev
 
-    def run_command(self, command, payload=bytes()):
+    def send_command(self, command, payload=bytes()):
         # TODO: check if payload not too long?
         buf = bytes([0x3f, len(payload) + 1, command]) + payload
         self._dev.write(buf)
-        response = self._dev.read(64, _TIMEOUT)
+
+    def read_response(self):
+        return bytes(self._dev.read(64, _TIMEOUT))
+
+    def run_command(self, command, payload=bytes()):
+        self.send_command(command, payload)
+        response = self.read_response()
         # TODO: what is returned on error, timeout?
         if len(response) < 2:
             raise DlError("response too short (%d bytes)", len(response))
@@ -148,9 +154,9 @@ class _DlHidConnection:
             raise DlError("invalid first byte (0x%02x)", response[0])
         if response[1] + 2 > len(response):
             raise DlError("response length too large (%d)", response[1])
-        return bytes(response[2:response[1] + 2])
+        return response[2:response[1] + 2]
 
-        
+
 def _get_string(bytes):
     return bytes.decode("ascii")
 
@@ -321,18 +327,44 @@ class Dl210Th(object):
         _check_response(response, length=51, prefix=[38])
         return response[1:]
 
+    def _decode_measurements(self, encoded):
+        data = []
+        for n in range(15):
+            i = 4 * n
+            data.append(Measurement.parse(encoded[i:i + 4]))
+        return data
+
     def get_data_block(self, n):
         # TODO: check that n fits in 16 bits?
         req = bytes([n >> 8, n & 0xff])
         response = self._connection.run_command(2, payload=req)
         _check_response(response, length=62, prefix=req)
+        # TODO: do incomplete blocks work?
+        return self._decode_measurements(response[2:])
 
+    def dump_data(self):
+        # TODO: flush any incoming data first? in all commands?
+        # maybe in send_command?
+        self._connection.send_command(1)
+        n = 1
         data = []
-        for n in range(15):
-            i = 2 + 4 * n
-            data.append(Measurement.parse(response[i:i + 4]))
+        while True:
+            r = self._connection.read_response()
+            if not r: break
+            l = r[1]
+            if l < 2: raise DlError("too short block")
+            if l == 2: continue
+            if l == 3: print(list(r))
+            # TODO: check how incomplete blocks are sent
+            if l != 62:
+                print("Expected 62 bytes: %d" % l)
+            block_n = (r[2] << 8) + r[3]
+            if n != block_n:
+                print("Unexpected block num: %d vs %d" % (block_n, n))
+            n = block_n + 1
+            data.extend(self._decode_measurements(r[4:]))
+            print(r[1], (r[2] << 8) + r[3])
         return data
-
 
 def set_time(dl):
     s = dl.cmd4()
