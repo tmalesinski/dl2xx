@@ -148,7 +148,7 @@ class _DlHidConnection:
             raise DlError("invalid first byte (0x%02x)", response[0])
         if response[1] + 2 > len(response):
             raise DlError("response length too large (%d)", response[1])
-        return response[2:response[1] + 2]
+        return bytes(response[2:response[1] + 2])
 
         
 def _get_string(bytes):
