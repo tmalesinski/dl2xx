@@ -1,6 +1,6 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
-import datetime, os
+import datetime, os, hid
 
 _TIMEOUT = 1000
 
@@ -127,72 +127,6 @@ class _BinaryRecord(object):
         return res
 
 
-class _DlConnection(object):
-    def __init__(self, dev_path):
-        self._fd = os.open(dev_path, os.O_RDWR)
-        # TODO: what exceptions can be raised?
-        # TODO: context manager
-        # TODO: check if this is the right device (minor/major)?
-        # TODO: check if vendor/product are correct?
-
-    def run_command(self, command, payload=bytes()):
-        # TODO: check if payload not too long?
-        os.write(self._fd, bytes([0x3f, len(payload) + 1, command]) + payload)
-        # TODO: check how many bytes written?
-        result = os.read(self._fd, 64)
-        if len(result) < 2:
-            raise DlError("result too short (%d bytes)", len(result))
-        if result[0] != 0x3f:
-            raise DlError("invalid first byte (0x%02x)", result[0])
-        if result[1] + 2 > len(result):
-            raise DlError("response length too large (%d)", result[1])
-        return result[2:result[1] + 2]
-
-    def close(self):
-        os.close(self._fd)
-        self._fd = None
-
-
-def _endpoint_is_out(e):
-    return (usb.util.endpoint_direction(e.bEndpointAddress) ==
-            usb.util.ENDPOINT_OUT)
-
-
-def _endpoint_is_in(e):
-    return (usb.util.endpoint_direction(e.bEndpointAddress) ==
-            usb.util.ENDPOINT_IN)
-
-
-class _DlUsbConnection:
-    def __init__(self, dev):
-        self._dev = dev
-        # TODO: set configuration
-        cfg = dev.get_active_configuration()
-        intf = usb.util.find_descriptor(cfg, bInterfaceClass=3)
-        # TODO: claim interface? or have methods to claim when needed?
-        if intf is None:
-            raise DlError("Could not find HID interface")
-
-        self._out = usb.util.find_descriptor(
-            intf, custom_match=_endpoint_is_out)
-        self._in = usb.util.find_descriptor(
-            intf, custom_match=_endpoint_is_in)
-
-    def run_command(self, command, payload=bytes()):
-        # TODO: check if payload not too long?
-        buf = bytes([0x3f, len(payload) + 1, command]) + payload
-        written = self._dev.write(self._out, buf, _TIMEOUT)
-        print(written)
-        response = self._dev.read(self._in, 64, _TIMEOUT)
-        if len(response) < 2:
-            raise DlError("response too short (%d bytes)", len(response))
-        if response[0] != 0x3f:
-            raise DlError("invalid first byte (0x%02x)", response[0])
-        if response[1] + 2 > len(response):
-            raise DlError("response length too large (%d)", response[1])
-        return response[2:response[1] + 2]
-
-        
 def open_hid_dev():
     h = hid.device()
     h.open(0x2047, 0x0301)
@@ -295,12 +229,8 @@ class Settings4(_BinaryRecord):
 
 
 class Dl210Th(object):
-    def __init__(self, dev_path):
-        self._connection = _DlConnection(dev_path)
-
-    def close(self):
-        self._connection.close()
-        self._connection = None
+    def __init__(self, c):
+        self._connection = c
 
     def status48(self):
         response = self._connection.run_command(48)
@@ -350,15 +280,14 @@ def set_time(dl):
                             hour=t.hour, minute=t.minute, second=t.second)
     dl.cmd3(s)
 
-# unbind?
-# echo 1-7.4:1.1 >/sys/bus/usb/drivers/usbhid/unbind 
-
 def main():
-    dev = usb.core.find(idVendor=0x2047, idProduct=0x0301)
-    interface = dev.configurations()[0].interfaces()[1]
-    # TODO: fails if a device is already configured which it is
-    # probably because it is a mass storage device
-    # dev.set_configuration()
-    # TODO: find the endpoint?
-    print(dev.write(0x02, msg, 1000))
-    
+    dev = open_hid_dev()
+    try:
+        c = _DlHidConnection(dev)
+        dl = Dl210Th(c)
+        print(dl.status48())
+    finally:
+        dev.close()
+
+if __name__ == "__main__":
+    main()
