@@ -311,6 +311,16 @@ class Dl210Th(object):
         _check_response(response, length=33, prefix=[36])
         return response[1:]
 
+    def get_string37(self):
+        response = self._connection.run_command(37)
+        _check_response(response, length=41, prefix=[37])
+        return response[1:]
+
+    def get_string38(self):
+        response = self._connection.run_command(38)
+        _check_response(response, length=51, prefix=[38])
+        return response[1:]
+
 
 def set_time(dl):
     s = dl.cmd4()
