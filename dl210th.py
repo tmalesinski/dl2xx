@@ -234,6 +234,12 @@ class Measurement(_BinaryRecord):
         _Word("humidity100")]
 
 
+class OwnerStartTime(_BinaryRecord):
+    _fields = [
+        _String("owner", 32),
+        _Subrecord("start_time", DateTimeRecord)]
+
+
 def _check_response(response, length=None, prefix=None):
     if length is not None and len(response) != length:
         raise DlError("expected %d bytes, got %d" % (length, len(response)))
@@ -295,7 +301,12 @@ class Dl210Th(object):
             raise DlError("invalid first bytes: %d" % response[0])
         return response[1:]
         
-        
+    def get_owner_start_time(self):
+        response = self._connection.run_command(35)
+        _check_response(response, length=40, prefix=[35])
+        return OwnerStartTime.parse(response[1:])
+
+
 def set_time(dl):
     s = dl.cmd4()
     t = datetime.datetime.now()
