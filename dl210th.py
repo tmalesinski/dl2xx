@@ -321,6 +321,18 @@ class Dl210Th(object):
         _check_response(response, length=51, prefix=[38])
         return response[1:]
 
+    def get_data_block(self, n):
+        # TODO: check that n fits in 16 bits?
+        req = bytes([n >> 8, n & 0xff])
+        response = self._connection.run_command(2, payload=req)
+        _check_response(response, length=62, prefix=req)
+
+        data = []
+        for n in range(15):
+            i = 2 + 4 * n
+            data.append(Measurement.parse(response[i:i + 4]))
+        return data
+
 
 def set_time(dl):
     s = dl.cmd4()
