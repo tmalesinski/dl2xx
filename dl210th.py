@@ -274,6 +274,11 @@ class Dl210Th(object):
         _check_response(response, length=7, prefix=[0, 0, 6])
         return Measurement.parse(response[3:])
 
+    def get_serial_id(self):
+        response = self._connection.run_command(12)
+        _check_response(response, length=16)
+        return response
+
     def get_settings33(self):
         response = self._connection.run_command(33)
         if len(response) != 60:
