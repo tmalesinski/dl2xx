@@ -345,7 +345,7 @@ class Dl210Th(object):
 
     def _decode_measurements(self, encoded):
         data = []
-        for n in range(15):
+        for n in range(len(encoded) // 4):
             i = 4 * n
             data.append(Measurement.parse(encoded[i:i + 4]))
         return data
@@ -354,8 +354,13 @@ class Dl210Th(object):
         # TODO: check that n fits in 16 bits?
         req = bytes([n >> 8, n & 0xff])
         response = self._connection.run_command(2, payload=req)
-        _check_response(response, length=62, prefix=req)
-        # TODO: do incomplete blocks work?
+        _check_response(response, prefix=req)
+        if len(response) < 2:
+            raise DlError("expected at least 2 bytes, got %d" % len(response))
+        if (len(response) - 2) % 4 != 0:
+            raise DlError("expected number of data bytes divisible by 4, "
+                          "got %d" % (len(response) - 2))
+        n_entries = (len(response) - 2) // 4
         return self._decode_measurements(response[2:])
 
     def dump_data(self):
@@ -364,22 +369,29 @@ class Dl210Th(object):
         self._connection.send_command(1)
         n = 1
         data = []
+        # TODO: verify that all blocks are read
+        # TODO: read start time and check that there were no new entries
+        # in between to have correct start time.
         while True:
             r = self._connection.read_response()
             if not r: break
             l = r[1]
             if l < 2: raise DlError("too short block")
+            # TODO: when do we get empty responses? when stopped?
             if l == 2: continue
-            if l == 3: print(list(r))
-            # TODO: check how incomplete blocks are sent
-            if l != 62:
-                print("Expected 62 bytes: %d" % l)
+            if l == 3:
+                if r[2:].startswith(bytes([0, 0, 5])):
+                    break
+                print("unexpected three byte response: %s" % list(r[0:5]))
+                break
+            if (l - 2) % 4 != 0:
+                raise DlError("expected number of data bytes divisible by 4, "
+                              "got %d" % (l - 2))
             block_n = (r[2] << 8) + r[3]
             if n != block_n:
                 print("Unexpected block num: %d vs %d" % (block_n, n))
             n = block_n + 1
             data.extend(self._decode_measurements(r[4:]))
-            print(r[1], (r[2] << 8) + r[3])
         return data
 
 def restart_recording(dl):
