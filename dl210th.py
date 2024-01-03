@@ -382,7 +382,7 @@ class Dl210Th(object):
             print(r[1], (r[2] << 8) + r[3])
         return data
 
-def set_time(dl):
+def restart_recording(dl):
     s = dl.cmd4()
     t = datetime.datetime.now()
     s.time = DateTimeRecord(year=t.year, month=t.month, day=t.day,
