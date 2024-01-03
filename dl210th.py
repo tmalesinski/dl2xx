@@ -161,34 +161,6 @@ def _get_string(bytes):
     return bytes.decode("ascii")
 
 
-class DlDateTime(object):
-    def __init__(self, serialized):
-        self.year = serialized[0] + serialized[1] * 256
-        self.month = serialized[2]
-        self.day = serialized[3]
-        self.hour = serialized[4]
-        self.minute = serialized[5]
-        self.second = serialized[6]
-        
-    def __repr__(self):
-        return ("<DlDateTime %04d-%02d-%02d %02d:%02d:%02d>" %
-                (self.year, self.month, self.day,
-                 self.hour, self.minute, self.second))
-
-
-class Settings33(object):
-    def __init__(self, response):
-        self.data = response
-        self.some_time1 = DlDateTime(response[30:37])
-        self.some_time2 = DlDateTime(response[41:48])
-        self.some_time3 = DlDateTime(response[48:56])
-
-    def __repr__(self):
-        return ("<Settings4 %s, %s, %s, %s>" %
-                (self.some_time1, self.some_time2, self.some_time3,
-                 list(self.data)))
-
-
 class DateTimeRecord(_BinaryRecord):
     _fields = [
         _Word("year"),
@@ -199,6 +171,44 @@ class DateTimeRecord(_BinaryRecord):
         _Byte("second")]
 
         
+# 59 bytes when read
+class Settings33Record(_BinaryRecord):
+    _fields = [
+        _Byte("unk0"),
+        _Byte("unk1"),
+        _Byte("unk2"),
+        _Byte("unk3"),
+        _Word("data_count"),
+        _Byte("unk6"),
+        _Byte("unk7"),
+        _Word("sample_rate"),
+        _Byte("unk8"),
+        _Byte("unk9"),
+        _Byte("led_flashing_interval_secs"),
+        _Byte("start_condition"),
+        _Byte("led_alarm"),
+        _Word("temp_low_alarm_100"),
+        _Word("temp_high_alarm_100"),
+        _Word("hum_low_alarm_100"),
+        _Word("hum_high_alarm_100"),
+        _Byte("unk10"),
+        _Byte("unk11"),
+        _Byte("unk12"),
+        _Byte("unk13"),
+        _Byte("unk14"),
+        _Byte("unk15"),
+        _Byte("unk16"),
+        _Subrecord("unk_time1", DateTimeRecord),
+        _Byte("unk17"),
+        _Byte("unk18"),
+        _Byte("enable_display"),
+        _Byte("stop_style"),
+        _Subrecord("unk_time2", DateTimeRecord),
+        _Subrecord("unk_time3", DateTimeRecord),
+        _Byte("start_delay_mins"),
+        _Word("logger_id"),
+        _Byte("unk19")]
+
 class Status48(_BinaryRecord):
     _fields = [
         _String("device_type", 16),
@@ -293,11 +303,8 @@ class Dl210Th(object):
 
     def get_settings33(self):
         response = self._connection.run_command(33)
-        if len(response) != 60:
-            raise DlError("expected 60 bytes, got %d" % len(response))
-        if response[0] != 33:
-            raise DlError("invalid first bytes: %d" % response[0])
-        return Settings33(response[1:])
+        _check_response(response, length=60, prefix=[33])
+        return Settings33Record.parse(response[1:])
         
     def get_settings34(self):
         response = self._connection.run_command(34)
