@@ -47,6 +47,23 @@ class _Word(_Field):
         return bytes([v & 0xff, v >> 8])
 
 
+class _Long(_Field):
+    def initial_value(self):
+        return 0
+
+    def serialized_length(self):
+        return 4
+
+    def _parse_internal(self, data, i):
+        v = 0
+        for j in range(4):
+            v = v + (data[i + j] << (j * 8))
+        return v
+
+    def serialize(self, v):
+        return bytes([(v >> (i * 8)) & 0xff for i in range(4)])
+
+
 class _String(_Field):
     def __init__(self, name, length):
         super().__init__(name)
@@ -181,9 +198,7 @@ class Settings33Record(_BinaryRecord):
         _Word("data_count"),
         _Byte("unk6"),
         _Byte("unk7"),
-        _Word("sample_rate"),
-        _Byte("unk8"),
-        _Byte("unk9"),
+        _Long("sample_rate"),
         _Byte("led_flashing_interval_secs"),
         _Byte("start_condition"),
         _Byte("led_alarm"),
@@ -225,23 +240,17 @@ class Settings4(_BinaryRecord):
         _Byte("unk1"),
         _Byte("unk2"),
         _Word("data_count"),
-        _Byte("unk5"),
-        _Byte("unk6"),
-        _Word("unk7"),
-        _Byte("unk8"),
-        _Byte("unk9"),
-        _Byte("unk10"),
-        _Byte("unk11"),
-        _Byte("unk12"),
-        _Byte("unk13"),
-        _Byte("unk14"),
-        _Byte("unk15"),
-        _Byte("unk16"),
-        _Byte("unk17"),
-        _Byte("unk18"),
-        _Byte("unk19"),
+        _Long("sample_rate"),
+        _Byte("led_flashing_interval_secs"),
+        _Byte("start_condition"),
+        _Byte("led_alarm"),
+        _Word("temp_low_alarm_100"),
+        _Word("temp_high_alarm_100"),
+        _Word("hum_low_alarm_100"),
+        _Word("hum_high_alarm_100"),
+        _Byte("temp_unit"),
         _Subrecord("time", DateTimeRecord),
-        _Byte("unk27")]
+        _Byte("date_format")]
 
 
 class Measurement(_BinaryRecord):
