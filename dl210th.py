@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import datetime, os, hid
+import argparse, datetime, os, hid
 
 _TIMEOUT = 1000
 
@@ -401,12 +401,56 @@ def restart_recording(dl):
                             hour=t.hour, minute=t.minute, second=t.second)
     dl.cmd3(s)
 
+
+def create_parser():
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest="command")
+
+    parser_status = subparsers.add_parser("status")
+    return parser
+
+
+def format_bytes(b):
+    return b.decode(errors='replace')
+
+
+def format_time(t):
+    # TODO: handle invalid dates?
+    dt = datetime.datetime(year=t.year, month=t.month, day=t.day,
+                           hour=t.hour, minute=t.minute, second=t.second)
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def print_fields(fields):
+    label_len = max([len(f[0]) for f in fields])
+    for f in fields:
+        print(f"{f[0]:{label_len}} {f[1]}")
+
+
+def handle_status(dl):
+    s = dl.status48()
+    print_fields([
+        ("Device type:", format_bytes(s.device_type)),
+        ("Current time:", format_time(s.time)),
+        ("Firmware version:", format_bytes(s.firmware_version)),
+        ("Serial number:", format_bytes(s.serial_number)),
+    ])
+
+
+def handle_command(args, dl):
+    if args.command == "status":
+        handle_status(dl)
+
+
 def main():
+    parser = create_parser()
+    args = parser.parse_args()
+
     dev = open_hid_dev()
     try:
         c = _DlHidConnection(dev)
         dl = Dl210Th(c)
-        print(dl.status48())
+        handle_command(args, dl)
     finally:
         dev.close()
 
