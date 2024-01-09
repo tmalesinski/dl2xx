@@ -276,6 +276,11 @@ class Dl210Th(object):
     def __init__(self, c):
         self._connection = c
 
+        s = self.status48()
+        device = s.device_type.decode("ascii", errors="replace").strip()
+        if device != "DL-210TH":
+            raise DlError("unsupported device: %s" % device)
+
     def status48(self):
         response = self._connection.run_command(48)
         if len(response) != 60:
