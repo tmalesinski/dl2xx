@@ -144,6 +144,12 @@ class _BinaryRecord(object):
         return res
 
 
+class DataBlock:
+    def __init__(self, num, measurements):
+        self.num = num
+        self.measurements = measurements
+
+
 def open_hid_dev():
     h = hid.device()
     h.open(0x2047, 0x0301)
@@ -348,12 +354,13 @@ class Dl210Th(object):
         _check_response(response, length=51, prefix=[38])
         return response[1:]
 
-    def _decode_measurements(self, encoded):
-        data = []
-        for n in range(len(encoded) // 4):
-            i = 4 * n
-            data.append(Measurement.parse(encoded[i:i + 4]))
-        return data
+    def _decode_block(self, encoded):
+        num = (encoded[0] << 8) + encoded[1]
+        block = DataBlock(num, [])
+        for n in range((len(encoded) - 2) // 4):
+            i = 2 + 4 * n
+            block.measurements.append(Measurement.parse(encoded[i:i + 4]))
+        return block
 
     def get_data_block(self, n):
         # TODO: check that n fits in 16 bits?
@@ -365,8 +372,7 @@ class Dl210Th(object):
         if (len(response) - 2) % 4 != 0:
             raise DlError("expected number of data bytes divisible by 4, "
                           "got %d" % (len(response) - 2))
-        n_entries = (len(response) - 2) // 4
-        return self._decode_measurements(response[2:])
+        return self._decode_block(response)
 
     def dump_data(self):
         # TODO: flush any incoming data first? in all commands?
@@ -380,6 +386,7 @@ class Dl210Th(object):
         while True:
             r = self._connection.read_response()
             if not r: break
+            # TODO: check if there is enough bytes in the response?
             l = r[1]
             if l < 2: raise DlError("too short block")
             # TODO: when do we get empty responses? when stopped?
@@ -392,12 +399,13 @@ class Dl210Th(object):
             if (l - 2) % 4 != 0:
                 raise DlError("expected number of data bytes divisible by 4, "
                               "got %d" % (l - 2))
-            block_n = (r[2] << 8) + r[3]
-            if n != block_n:
-                print("Unexpected block num: %d vs %d" % (block_n, n))
-            n = block_n + 1
-            data.extend(self._decode_measurements(r[4:]))
+            block = self._decode_block(r[2:])
+            if n != block.num:
+                print("Unexpected block num: %d vs %d" % (block.num, n))
+            n = block.num + 1
+            data.append(block)
         return data
+
 
 def restart_recording(dl):
     s = dl.cmd4()
