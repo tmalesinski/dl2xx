@@ -193,7 +193,12 @@ class DateTimeRecord(_BinaryRecord):
         _Byte("minute"),
         _Byte("second")]
 
-        
+    def to_datetime(self):
+        return datetime.datetime(
+            year=self.year, month=self.month, day=self.day,
+            hour=self.hour, minute=self.minute, second=self.second)
+
+
 # 59 bytes when read
 class Settings33Record(_BinaryRecord):
     _fields = [
@@ -261,6 +266,7 @@ class Settings4(_BinaryRecord):
 
 class Measurement(_BinaryRecord):
     _fields = [
+        # TODO: how are negative temperatures stored?
         _Word("temperature100"),
         _Word("humidity100")]
 
@@ -386,9 +392,15 @@ class Dl210Th(object):
         while True:
             r = self._connection.read_response()
             if not r: break
+            # TODO: the same is in run_command
+            if len(r) < 2:
+                raise DlError("response too short: %d" % len(r))
+            if r[0] != 0x3f:
+                raise DlError("invalid first response byte: %d" % r[0])
             # TODO: check if there is enough bytes in the response?
             l = r[1]
             if l < 2: raise DlError("too short block")
+            if l > len(r) - 2: raise DlError("number of data bytes too big")
             # TODO: when do we get empty responses? when stopped?
             if l == 2: continue
             if l == 3:
@@ -399,7 +411,7 @@ class Dl210Th(object):
             if (l - 2) % 4 != 0:
                 raise DlError("expected number of data bytes divisible by 4, "
                               "got %d" % (l - 2))
-            block = self._decode_block(r[2:])
+            block = self._decode_block(r[2:2 + l])
             if n != block.num:
                 print("Unexpected block num: %d vs %d" % (block.num, n))
             n = block.num + 1
@@ -415,11 +427,48 @@ def restart_recording(dl):
     dl.cmd3(s)
 
 
+def read_measurements(dl):
+    state_before = dl.cmd4()
+    blocks = dl.dump_data()
+    state_after = dl.cmd4()
+
+    # TODO: repeat
+    # TODO: should also check start date
+    if state_before.data_count != state_after.data_count:
+        raise DlError(f"data item added while dupming "
+                      f"{state_before.data_count} {state_after.data_count}")
+
+    per_block = 15
+    expected_blocks = (state_after.data_count + (per_block - 1)) // per_block
+    print(f"{expected_blocks} {len(blocks)}")
+    time = state_after.time.to_datetime()
+    print(time)
+
+    # TODO: make it an array?
+    block_map = {}
+    for b in blocks:
+        # TODO: retry?
+        if b.num in block_map:
+            raise DlError(f"duplicate data block: {b.num}")
+        block_map[b.num] = b
+
+    sample_rate = datetime.timedelta(seconds=state_after.sample_rate)
+    for i in range(1, expected_blocks + 1):
+        # TODO: retry or refill missing blocks
+        if i not in block_map:
+            raise DlError(f"missing block: {i}")
+        for m in block_map[i].measurements:
+            print(time.strftime("%m%d,%H:%M:%S") +
+                  f",{m.temperature100 / 100},{m.humidity100 / 100}")
+            time += sample_rate
+
+
 def create_parser():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command")
 
     parser_status = subparsers.add_parser("status")
+    parser_dump = subparsers.add_parser("dump")
     return parser
 
 
@@ -429,9 +478,7 @@ def format_bytes(b):
 
 def format_time(t):
     # TODO: handle invalid dates?
-    dt = datetime.datetime(year=t.year, month=t.month, day=t.day,
-                           hour=t.hour, minute=t.minute, second=t.second)
-    return dt.strftime("%Y-%m-%d %H:%M:%S")
+    return t.to_datetime().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def print_fields(fields):
@@ -450,8 +497,14 @@ def handle_status(dl):
     ])
 
 
+def handle_dump(dl):
+    read_measurements(dl)
+
+
 def handle_command(args, dl):
-    if args.command == "status":
+    if args.command == "dump":
+        handle_dump(dl)
+    elif args.command == "status":
         handle_status(dl)
 
 
