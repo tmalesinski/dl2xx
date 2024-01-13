@@ -427,38 +427,55 @@ def restart_recording(dl):
     dl.cmd3(s)
 
 
-def read_measurements(dl):
+def _try_read_measurements(dl):
     state_before = dl.cmd4()
     blocks = dl.dump_data()
     state_after = dl.cmd4()
 
-    # TODO: repeat
-    # TODO: should also check start date
-    if state_before.data_count != state_after.data_count:
-        raise DlError(f"data item added while dupming "
-                      f"{state_before.data_count} {state_after.data_count}")
+    # TODO: handle invalid start dates?
+    if ((state_before.data_count != state_after.data_count) or
+        (state_before.time.to_datetime() != state_after.time.to_datetime())):
+        raise DlError(f"data item added while dumping")
 
     per_block = 15
     expected_blocks = (state_after.data_count + (per_block - 1)) // per_block
-    print(f"{expected_blocks} {len(blocks)}")
     time = state_after.time.to_datetime()
-    print(time)
 
-    # TODO: make it an array?
-    block_map = {}
+    result = [None] * expected_blocks
     for b in blocks:
-        # TODO: retry?
-        if b.num in block_map:
+        if b.num < 1 or b.num > expected_blocks:
+            # Ignore blocks with unexpected numbers
+            continue
+        if result[b.num - 1] is not None:
             raise DlError(f"duplicate data block: {b.num}")
-        block_map[b.num] = b
+        result[b.num - 1] = b
 
-    sample_rate = datetime.timedelta(seconds=state_after.sample_rate)
-    for i in range(1, expected_blocks + 1):
-        # TODO: retry or refill missing blocks
-        if i not in block_map:
-            raise DlError(f"missing block: {i}")
-        for m in block_map[i].measurements:
-            print(time.strftime("%m%d,%H:%M:%S") +
+    # TODO: check if there is expected number of entries? or not?
+    # TODO: refill with cmd2?
+    for b in result:
+        if b is None:
+            raise DlError("missing blocks")
+
+    return result, state_after
+
+def read_measurements(dl):
+    num_retries = 5
+    while True:
+        try:
+            blocks, state = _try_read_measurements(dl)
+        except DlError as e:
+            num_retries -= 1
+            if num_retries >= 0:
+                continue
+            raise
+        else:
+            break
+
+    time = state.time.to_datetime()
+    sample_rate = datetime.timedelta(seconds=state.sample_rate)
+    for b in blocks:
+        for m in b.measurements:
+            print(time.strftime("%Y-%m-%d %H:%M:%S") +
                   f",{m.temperature100 / 100},{m.humidity100 / 100}")
             time += sample_rate
 
