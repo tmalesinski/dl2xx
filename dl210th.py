@@ -486,6 +486,7 @@ def create_parser():
 
     parser_status = subparsers.add_parser("status")
     parser_dump = subparsers.add_parser("dump")
+    parser_config = subparsers.add_parser("config")
     return parser
 
 
@@ -496,6 +497,47 @@ def format_bytes(b):
 def format_time(t):
     # TODO: handle invalid dates?
     return t.to_datetime().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def format_interval_secs(secs):
+    # TODO: improve
+    return f"{secs}s"
+
+
+_START_CONDITIONS = [
+    (0, "Immediately until memory full"),
+    (1, "Start upon keypress"),
+]
+
+def start_condition_name(c):
+    for i, name in _START_CONDITIONS:
+        if i == c:
+            return name
+    return f"???({c})"
+
+
+def format_led_alarm(a):
+    # TODO:
+    return f"???{a}"
+
+
+# TODO: units
+def format_temperature100(t100):
+    return f"{t100 / 100}"
+
+
+def format_humidity100(h100):
+    return f"{h100 / 100}%"
+
+
+def format_temp_unit(u):
+    # TODO:
+    return f"???{u}"
+
+
+def format_date_format(f):
+    # TODO:
+    return f"???{f}"
 
 
 def print_fields(fields):
@@ -518,12 +560,41 @@ def handle_dump(dl):
     read_measurements(dl)
 
 
+def handle_config(dl):
+    # TODO: use get_settings34 instead?
+    response = dl.cmd4()
+    fields = [
+        ("Sample rate:", format_interval_secs(response.sample_rate)),
+        ("Led flashing interval:",
+         format_interval_secs(response.led_flashing_interval_secs)),
+        ("Start condition:",
+         start_condition_name(response.start_condition)),
+        ("LED alarm:",
+         format_led_alarm(response.led_alarm)),
+        # TODO: add thresholds conditionally? based on what?
+        ("Temperature low alarm:",
+         format_temperature100(response.temp_low_alarm_100)),
+        ("Temperature high alarm:",
+         format_temperature100(response.temp_high_alarm_100)),
+        ("Humidity low alarm:",
+         format_humidity100(response.hum_low_alarm_100)),
+        ("Humidity high alarm:",
+         format_humidity100(response.hum_high_alarm_100)),
+        ("Temperature unit:",
+         format_temp_unit(response.temp_unit)),
+        ("Date format:",
+         format_date_format(response.date_format))
+        ]
+    print_fields(fields)
+
+
 def handle_command(args, dl):
     if args.command == "dump":
         handle_dump(dl)
     elif args.command == "status":
         handle_status(dl)
-
+    elif args.command == "config":
+        handle_config(dl)
 
 def main():
     parser = create_parser()
