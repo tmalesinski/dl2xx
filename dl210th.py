@@ -350,14 +350,19 @@ class Dl210Th(object):
         _check_response(response, length=33, prefix=[36])
         return response[1:]
 
-    def get_string37(self):
+    def get_report_title(self):
         response = self._connection.run_command(37)
         _check_response(response, length=41, prefix=[37])
         return response[1:]
 
-    def get_string38(self):
+    def get_user_text1(self):
         response = self._connection.run_command(38)
         _check_response(response, length=51, prefix=[38])
+        return response[1:]
+
+    def get_user_text2(self):
+        response = self._connection.run_command(39)
+        _check_response(response, length=21, prefix=[39])
         return response[1:]
 
     def _decode_block(self, encoded):
@@ -495,6 +500,13 @@ def format_bytes(b):
     return b.decode(errors='replace')
 
 
+def format_0term_bytes(b):
+    i = b.find(bytes(0))
+    if i >= 0:
+        b = b[:i]
+    return format_bytes(b)
+
+
 def format_time(t):
     # TODO: handle invalid dates?
     return t.to_datetime().strftime("%Y-%m-%d %H:%M:%S")
@@ -607,6 +619,11 @@ def handle_config(dl):
 def handle_config2(dl):
     # TODO: use this instead of handle_config?
     response = dl.get_settings33()
+    owner = dl.get_owner_start_time()
+    location = dl.get_location()
+    report_title = dl.get_report_title()
+    user_text1 = dl.get_user_text1()
+    user_text2 = dl.get_user_text2()
     fields = [
         ("Sample rate:", format_interval_secs(response.sample_rate)),
         ("Led flashing interval:",
@@ -635,6 +652,11 @@ def handle_config2(dl):
         # ("Unknown (stop?) time", format_time(response.unk_time3)),
         ("Start delay:", f"{response.start_delay_mins}m"),
         ("Logger id:", f"{response.logger_id:04}"),
+        ("Owner:", format_0term_bytes(owner.owner)),
+        ("Location:", format_0term_bytes(location)),
+        ("Report Title:", format_0term_bytes(report_title)),
+        # TODO: may contain new lines (dos encoding)
+        ("User Text:", format_0term_bytes(user_text1 + user_text2)),
         ]
     print_fields(fields)
 
