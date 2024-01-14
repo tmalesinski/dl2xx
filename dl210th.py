@@ -221,11 +221,11 @@ class Settings33Record(_BinaryRecord):
         _Byte("unk11"),
         _Byte("unk12"),
         _Byte("unk13"),
-        _Byte("unk14"),
+        _Byte("temp_unit"),
         _Byte("unk15"),
         _Byte("unk16"),
         _Subrecord("unk_time1", DateTimeRecord),
-        _Byte("unk17"),
+        _Byte("date_format"),
         _Byte("unk18"),
         _Byte("enable_display"),
         _Byte("stop_style"),
@@ -487,6 +487,7 @@ def create_parser():
     parser_status = subparsers.add_parser("status")
     parser_dump = subparsers.add_parser("dump")
     parser_config = subparsers.add_parser("config")
+    parser_config2 = subparsers.add_parser("config2")
     return parser
 
 
@@ -504,16 +505,32 @@ def format_interval_secs(secs):
     return f"{secs}s"
 
 
+def format_bool(b):
+    return "On" if b else "Off"
+
+
 _START_CONDITIONS = [
     (0, "Immediately until memory full"),
     (1, "Start upon keypress"),
 ]
 
-def start_condition_name(c):
-    for i, name in _START_CONDITIONS:
+_STOP_STYLES = [
+    (0, "None"),
+    (1, "Stop button"),
+]
+
+def condition_name(desc, c):
+    for i, name in desc:
         if i == c:
             return name
     return f"???({c})"
+
+def start_condition_name(c):
+    return condition_name(_START_CONDITIONS, c)
+
+
+def stop_style_name(c):
+    return condition_name(_STOP_STYLES, c)
 
 
 def format_led_alarm(a):
@@ -561,7 +578,6 @@ def handle_dump(dl):
 
 
 def handle_config(dl):
-    # TODO: use get_settings34 instead?
     response = dl.cmd4()
     fields = [
         ("Sample rate:", format_interval_secs(response.sample_rate)),
@@ -588,6 +604,41 @@ def handle_config(dl):
     print_fields(fields)
 
 
+def handle_config2(dl):
+    # TODO: use this instead of handle_config?
+    response = dl.get_settings33()
+    fields = [
+        ("Sample rate:", format_interval_secs(response.sample_rate)),
+        ("Led flashing interval:",
+         format_interval_secs(response.led_flashing_interval_secs)),
+        ("Start condition:",
+         start_condition_name(response.start_condition)),
+        ("LED alarm:",
+         format_led_alarm(response.led_alarm)),
+        # TODO: add thresholds conditionally? based on what?
+        ("Temperature low alarm:",
+         format_temperature100(response.temp_low_alarm_100)),
+        ("Temperature high alarm:",
+         format_temperature100(response.temp_high_alarm_100)),
+        ("Humidity low alarm:",
+         format_humidity100(response.hum_low_alarm_100)),
+        ("Humidity high alarm:",
+         format_humidity100(response.hum_high_alarm_100)),
+        ("Temperature unit:",
+         format_temp_unit(response.temp_unit)),
+        ("Date format:",
+         format_date_format(response.date_format)),
+        ("Enable display:", format_bool(response.enable_display)),
+        ("Stop style:", stop_style_name(response.stop_style)),
+        # TODO:
+        # ("Unknown (start?) time", format_time(response.unk_time2)),
+        # ("Unknown (stop?) time", format_time(response.unk_time3)),
+        ("Start delay:", f"{response.start_delay_mins}m"),
+        ("Logger id:", f"{response.logger_id:04}"),
+        ]
+    print_fields(fields)
+
+
 def handle_command(args, dl):
     if args.command == "dump":
         handle_dump(dl)
@@ -595,6 +646,9 @@ def handle_command(args, dl):
         handle_status(dl)
     elif args.command == "config":
         handle_config(dl)
+    elif args.command == "config2":
+        handle_config2(dl)
+
 
 def main():
     parser = create_parser()
