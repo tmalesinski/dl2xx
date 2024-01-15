@@ -386,9 +386,6 @@ class Dl210Th(object):
         return self._decode_block(response)
 
     def dump_data(self):
-        # TODO: work around a bug in which if there are more than 2^14 entries,
-        # data_count * 4 overflows and only a small number of blocks is
-        # returned. Should be fixed with requesting blocks with cmd2.
         # TODO: flush any incoming data first? in all commands?
         # maybe in send_command?
         self._connection.send_command(1)
@@ -438,16 +435,12 @@ def restart_recording(dl):
 def _try_read_measurements(dl):
     state_before = dl.cmd4()
     blocks = dl.dump_data()
-    state_after = dl.cmd4()
-
-    # TODO: handle invalid start dates?
-    if ((state_before.data_count != state_after.data_count) or
-        (state_before.time.to_datetime() != state_after.time.to_datetime())):
-        raise DlError(f"data item added while dumping")
 
     per_block = 15
-    expected_blocks = (state_after.data_count + (per_block - 1)) // per_block
-    time = state_after.time.to_datetime()
+    expected_blocks = (state_before.data_count + (per_block - 1)) // per_block
+    expected_in_last = state_before.data_count % per_block
+    if expected_in_last == 0:
+        expected_in_last = per_block
 
     result = [None] * expected_blocks
     for b in blocks:
@@ -458,11 +451,18 @@ def _try_read_measurements(dl):
             raise DlError(f"duplicate data block: {b.num}")
         result[b.num - 1] = b
 
-    # TODO: check if there is expected number of entries? or not?
-    # TODO: refill with cmd2?
-    for b in result:
-        if b is None:
-            raise DlError("missing blocks")
+    # TODO: check if there is expected number of entries in total? or not?
+    for i, b in enumerate(result):
+        exp_len = expected_in_last if i == expected_blocks - 1 else per_block
+        if b is None or len(b.measurements) < per_block:
+            result[i] = dl.get_data_block(i + 1)
+
+    state_after = dl.cmd4()
+
+    # TODO: handle invalid start dates?
+    if ((state_before.data_count != state_after.data_count) or
+        (state_before.time.to_datetime() != state_after.time.to_datetime())):
+        raise DlError(f"data item added while dumping")
 
     return result, state_after
 
