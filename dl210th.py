@@ -47,6 +47,25 @@ class _Word(_Field):
         return bytes([v & 0xff, v >> 8])
 
 
+class _SWord(_Field):
+    def initial_value(self):
+        return 0
+
+    def serialized_length(self):
+        return 2
+
+    def _parse_internal(self, data, i):
+        v = data[i] + (data[i + 1] << 8)
+        if v & 0x8000:
+            v -= 0x10000
+        return v
+
+    def serialize(self, v):
+        if v < 0:
+            v += 0x10000
+        return bytes([v & 0xff, v >> 8])
+
+
 class _Long(_Field):
     def initial_value(self):
         return 0
@@ -213,10 +232,10 @@ class Settings33Record(_BinaryRecord):
         _Byte("led_flashing_interval_secs"),
         _Byte("start_condition"),
         _Byte("led_alarm"),
-        _Word("temp_low_alarm_100"),
-        _Word("temp_high_alarm_100"),
-        _Word("hum_low_alarm_100"),
-        _Word("hum_high_alarm_100"),
+        _SWord("temp_low_alarm_100"),
+        _SWord("temp_high_alarm_100"),
+        _SWord("hum_low_alarm_100"),
+        _SWord("hum_high_alarm_100"),
         _Byte("unk10"),
         _Byte("unk11"),
         _Byte("unk12"),
@@ -255,10 +274,10 @@ class Settings4(_BinaryRecord):
         _Byte("led_flashing_interval_secs"),
         _Byte("start_condition"),
         _Byte("led_alarm"),
-        _Word("temp_low_alarm_100"),
-        _Word("temp_high_alarm_100"),
-        _Word("hum_low_alarm_100"),
-        _Word("hum_high_alarm_100"),
+        _SWord("temp_low_alarm_100"),
+        _SWord("temp_high_alarm_100"),
+        _SWord("hum_low_alarm_100"),
+        _SWord("hum_high_alarm_100"),
         _Byte("temp_unit"),
         _Subrecord("time", DateTimeRecord),
         _Byte("date_format")]
@@ -266,9 +285,8 @@ class Settings4(_BinaryRecord):
 
 class Measurement(_BinaryRecord):
     _fields = [
-        # TODO: how are negative temperatures stored?
-        _Word("temperature100"),
-        _Word("humidity100")]
+        _SWord("temperature100"),
+        _SWord("humidity100")]
 
 
 class OwnerStartTime(_BinaryRecord):
