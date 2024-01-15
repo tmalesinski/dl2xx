@@ -386,6 +386,9 @@ class Dl210Th(object):
         return self._decode_block(response)
 
     def dump_data(self):
+        # TODO: work around a bug in which if there are more than 2^14 entries,
+        # data_count * 4 overflows and only a small number of blocks is
+        # returned. Should be fixed with requesting blocks with cmd2.
         # TODO: flush any incoming data first? in all commands?
         # maybe in send_command?
         self._connection.send_command(1)
