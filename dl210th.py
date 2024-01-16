@@ -442,14 +442,6 @@ class Dl210Th(object):
         return data
 
 
-def restart_recording(dl):
-    s = dl.cmd4()
-    t = datetime.datetime.now()
-    s.time = DateTimeRecord(year=t.year, month=t.month, day=t.day,
-                            hour=t.hour, minute=t.minute, second=t.second)
-    dl.cmd3(s)
-
-
 def _try_read_measurements(dl):
     state_before = dl.cmd4()
     blocks = dl.dump_data()
@@ -514,6 +506,12 @@ def create_parser():
     parser_dump = subparsers.add_parser("dump")
     parser_config = subparsers.add_parser("config")
     parser_config2 = subparsers.add_parser("config2")
+    parser_record = subparsers.add_parser("record")
+    # TODO: the help message for this has all possible numbers now
+    parser_record.add_argument("--sample-rate-sec", dest="sample_rate",
+                               type=int, choices=range(60, 24 * 60 * 60))
+    parser_record.add_argument("--start-condition", dest="start_condition",
+                               choices=condition_ids(_START_CONDITIONS))
     return parser
 
 
@@ -543,8 +541,9 @@ def format_bool(b):
 
 
 _START_CONDITIONS = [
-    (0, "Immediately until memory full"),
-    (1, "Start upon keypress"),
+    (0, "Immediately until memory full", "immediately"),
+    (1, "Start upon keypress", "keypress"),
+    (4, "Circular", "circular"),
 ]
 
 _STOP_STYLES = [
@@ -557,6 +556,18 @@ def condition_name(desc, c):
         if i == c:
             return name
     return f"???({c})"
+
+
+def condition_ids(desc):
+    return [c[2] for c in desc]
+
+
+def parse_condition(desc, c):
+    for i, _, ident in desc:
+        if c == ident:
+            return i
+    raise KeyError("Unknown condition " + c)
+
 
 def start_condition_name(c):
     return condition_name(_START_CONDITIONS, c)
@@ -682,6 +693,19 @@ def handle_config2(dl):
     print_fields(fields)
 
 
+def handle_record(args, dl):
+    s = dl.cmd4()
+    t = datetime.datetime.now()
+    s.time = DateTimeRecord(year=t.year, month=t.month, day=t.day,
+                            hour=t.hour, minute=t.minute, second=t.second)
+    if args.sample_rate is not None:
+        s.sample_rate = args.sample_rate
+    if args.start_condition is not None:
+        s.start_condition = parse_condition(
+            _START_CONDITIONS, args.start_condition)
+    dl.cmd3(s)
+
+
 def handle_command(args, dl):
     if args.command == "dump":
         handle_dump(dl)
@@ -691,6 +715,8 @@ def handle_command(args, dl):
         handle_config(dl)
     elif args.command == "config2":
         handle_config2(dl)
+    elif args.command == "record":
+        handle_record(args, dl)
 
 
 def main():
