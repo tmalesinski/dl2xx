@@ -512,6 +512,8 @@ def create_parser():
                                type=int, choices=range(60, 24 * 60 * 60))
     parser_record.add_argument("--start-condition", dest="start_condition",
                                choices=condition_ids(_START_CONDITIONS))
+    parser_measure = subparsers.add_parser("measure")
+
     return parser
 
 
@@ -706,6 +708,12 @@ def handle_record(args, dl):
     dl.cmd3(s)
 
 
+def handle_measure(dl):
+    m = dl.read_sensors()
+    print_fields([("Temperature:", format_temperature100(m.temperature100)),
+                  ("Humidity:", format_humidity100(m.humidity100))])
+
+
 def handle_command(args, dl):
     if args.command == "dump":
         handle_dump(dl)
@@ -717,6 +725,8 @@ def handle_command(args, dl):
         handle_config2(dl)
     elif args.command == "record":
         handle_record(args, dl)
+    elif args.command == "measure":
+        handle_measure(dl)
 
 
 def main():
