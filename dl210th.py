@@ -219,7 +219,7 @@ class DateTimeRecord(_BinaryRecord):
 
 
 # 59 bytes when read
-class Settings33Record(_BinaryRecord):
+class LoggerConfig(_BinaryRecord):
     _fields = [
         _Byte("unk0"),
         _Byte("unk1"),
@@ -254,7 +254,7 @@ class Settings33Record(_BinaryRecord):
         _Word("logger_id"),
         _Byte("unk19")]
 
-class Status48(_BinaryRecord):
+class StatusRecord(_BinaryRecord):
     _fields = [
         _String("device_type", 16),
         _Subrecord("time", DateTimeRecord),
@@ -265,7 +265,7 @@ class Status48(_BinaryRecord):
         _String("unset", 2)]
 
 
-class Settings4(_BinaryRecord):
+class BasicConfig(_BinaryRecord):
     _fields = [
         _Byte("unk1"),
         _Byte("unk2"),
@@ -306,34 +306,34 @@ class Dl210Th(object):
     def __init__(self, c):
         self._connection = c
 
-        s = self.status48()
+        s = self.status()
         device = s.device_type.decode("ascii", errors="replace").strip()
         if device != "DL-210TH":
             raise DlError("unsupported device: %s" % device)
 
-    def status48(self):
+    def status(self):
         response = self._connection.run_command(48)
         if len(response) != 60:
             raise DlError("expected 60 bytes, got %d" % len(response))
         if response[0] != 48:
             raise DlError("expected first reponse byte to be 0x30, got 0x%02x",
                           response[0])
-        return Status48.parse(response[1:])
+        return StatusRecord.parse(response[1:])
 
-    def cmd3(self, settings4):
-        response = self._connection.run_command(3, settings4.serialize())
+    def record_basic(self, basic_config):
+        response = self._connection.run_command(3, basic_config.serialize())
         if len(response) != 3:
             raise DlError("expected 3 bytes, got %d" % len(response))
         if response[0:3] != bytes([0, 0, 3]):
             raise DlError("invalid three first bytes: %s" % response[0:3])
 
-    def cmd4(self):
+    def get_basic_config(self):
         response = self._connection.run_command(4)
         if len(response) != 31:
             raise DlError("expected 31 bytes, got %d" % len(response))
         if response[0:3] != bytes([0, 0, 4]):
             raise DlError("invalid three first bytes: %s" % response[0:3])
-        return Settings4.parse(response[3:])
+        return BasicConfig.parse(response[3:])
 
     def read_sensors(self):
         response = self._connection.run_command(6)
@@ -345,10 +345,10 @@ class Dl210Th(object):
         _check_response(response, length=16)
         return response
 
-    def get_settings33(self):
+    def get_logger_config(self):
         response = self._connection.run_command(33)
         _check_response(response, length=60, prefix=[33])
-        return Settings33Record.parse(response[1:])
+        return LoggerConfig.parse(response[1:])
         
     def get_settings34(self):
         response = self._connection.run_command(34)
@@ -443,7 +443,7 @@ class Dl210Th(object):
 
 
 def _try_read_measurements(dl):
-    state_before = dl.cmd4()
+    state_before = dl.get_basic_config()
     blocks = dl.dump_data()
 
     per_block = 15
@@ -467,7 +467,7 @@ def _try_read_measurements(dl):
         if b is None or len(b.measurements) < per_block:
             result[i] = dl.get_data_block(i + 1)
 
-    state_after = dl.cmd4()
+    state_after = dl.get_basic_config()
 
     # TODO: handle invalid start dates?
     if ((state_before.data_count != state_after.data_count) or
@@ -610,7 +610,7 @@ def print_fields(fields):
 
 
 def handle_status(dl):
-    s = dl.status48()
+    s = dl.status()
     print_fields([
         ("Device type:", format_bytes(s.device_type)),
         ("Current time:", format_time(s.time)),
@@ -624,7 +624,7 @@ def handle_dump(dl):
 
 
 def handle_config(dl):
-    response = dl.cmd4()
+    response = dl.get_basic_config()
     fields = [
         ("Sample rate:", format_interval_secs(response.sample_rate)),
         ("Led flashing interval:",
@@ -652,7 +652,7 @@ def handle_config(dl):
 
 def handle_config2(dl):
     # TODO: use this instead of handle_config?
-    response = dl.get_settings33()
+    response = dl.get_logger_config()
     owner = dl.get_owner_start_time()
     location = dl.get_location()
     report_title = dl.get_report_title()
@@ -696,7 +696,7 @@ def handle_config2(dl):
 
 
 def handle_record(args, dl):
-    s = dl.cmd4()
+    s = dl.get_basic_config()
     t = datetime.datetime.now()
     s.time = DateTimeRecord(year=t.year, month=t.month, day=t.day,
                             hour=t.hour, minute=t.minute, second=t.second)
@@ -705,7 +705,7 @@ def handle_record(args, dl):
     if args.start_condition is not None:
         s.start_condition = parse_condition(
             _START_CONDITIONS, args.start_condition)
-    dl.cmd3(s)
+    dl.record_basic(s)
 
 
 def handle_measure(dl):
