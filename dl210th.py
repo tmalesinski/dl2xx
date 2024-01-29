@@ -549,12 +549,12 @@ _START_CONDITIONS = [
 ]
 
 _STOP_STYLES = [
-    (0, "None"),
-    (1, "Stop button"),
+    (0, "None", "none"),
+    (1, "Stop button", "button"),
 ]
 
 def condition_name(desc, c):
-    for i, name in desc:
+    for i, name, _ in desc:
         if i == c:
             return name
     return f"???({c})"
