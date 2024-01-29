@@ -522,7 +522,7 @@ def format_bytes(b):
 
 
 def format_0term_bytes(b):
-    i = b.find(bytes(0))
+    i = b.find(bytes([0]))
     if i >= 0:
         b = b[:i]
     return format_bytes(b)
