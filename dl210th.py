@@ -499,19 +499,30 @@ def read_measurements(dl):
 
 
 def create_parser():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Controls the Voltcraft DL-210TH logger")
     subparsers = parser.add_subparsers(dest="command")
 
-    parser_status = subparsers.add_parser("status")
-    parser_dump = subparsers.add_parser("dump")
-    parser_config = subparsers.add_parser("config")
-    parser_config2 = subparsers.add_parser("config2")
-    parser_record = subparsers.add_parser("record")
-    # TODO: the help message for this has all possible numbers now
-    parser_record.add_argument("--sample-rate-sec", dest="sample_rate",
-                               type=int, choices=range(60, 24 * 60 * 60))
-    parser_record.add_argument("--start-condition", dest="start_condition",
-                               choices=condition_ids(_START_CONDITIONS))
+    parser_status = subparsers.add_parser(
+        "status", help="print the device status")
+    parser_dump = subparsers.add_parser(
+        "dump", help="dump measurements as CSV to stdout")
+    parser_config = subparsers.add_parser(
+        "config", help="print device configuration")
+    parser_config2 = subparsers.add_parser(
+        "config2", help="print more detailed device configuration")
+    parser_record = subparsers.add_parser(
+        "record", help="start logging (clears previously recorded data)")
+    parser_record.add_argument(
+        "--sample-rate-sec", dest="sample_rate",
+        type=int, choices=range(60, 24 * 60 * 60),
+        # TODO: error message still lists all values
+        help="time between measurements in seconds (between 60 and 86400)",
+        metavar="S")
+    parser_record.add_argument(
+        "--start-condition", dest="start_condition",
+        choices=condition_ids(_START_CONDITIONS),
+        help="start condition: " + condition_help(_START_CONDITIONS))
     parser_measure = subparsers.add_parser("measure")
 
     return parser
@@ -558,6 +569,11 @@ def condition_name(desc, c):
         if i == c:
             return name
     return f"???({c})"
+
+
+def condition_help(desc):
+    return ", ".join([f"{short_name}: {name.lower()}"
+        for _, name, short_name in desc])
 
 
 def condition_ids(desc):
