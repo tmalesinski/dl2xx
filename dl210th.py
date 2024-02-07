@@ -20,6 +20,12 @@
 
 import argparse, datetime, os, hid
 
+_VERSION_NOTICE = """dl210th client 0.1
+Copyright (C) 2024 Tomasz Malesinski
+License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law."""
+
 _TIMEOUT = 1000
 
 class DlError(Exception):
@@ -519,6 +525,8 @@ def read_measurements(dl):
 def create_parser():
     parser = argparse.ArgumentParser(
         description="Controls the Voltcraft DL-210TH logger")
+    parser.add_argument("--version", action="store_true")
+
     subparsers = parser.add_subparsers(dest="command")
 
     parser_status = subparsers.add_parser(
@@ -766,6 +774,9 @@ def handle_command(args, dl):
 def main():
     parser = create_parser()
     args = parser.parse_args()
+    if args.version:
+        print(_VERSION_NOTICE)
+        return
 
     dev = open_hid_dev()
     try:
