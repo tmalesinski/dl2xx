@@ -246,10 +246,10 @@ class DateTimeRecord(_BinaryRecord):
             year=self.year, month=self.month, day=self.day,
             hour=self.hour, minute=self.minute, second=self.second)
 
-
-def date_time_record_from_datetime(t):
-    return DateTimeRecord(year=t.year, month=t.month, day=t.day,
-                          hour=t.hour, minute=t.minute, second=t.second)
+    @staticmethod
+    def from_datetime(t):
+        return DateTimeRecord(year=t.year, month=t.month, day=t.day,
+                              hour=t.hour, minute=t.minute, second=t.second)
 
 
 # 59 bytes when read
@@ -751,7 +751,7 @@ def handle_config(dl):
 
 def handle_record(args, dl):
     cfg = dl.get_logger_config()
-    cfg.time = date_time_record_from_datetime(datetime.datetime.now())
+    cfg.time = DateTimeRecord.from_datetime(datetime.datetime.now())
     if args.sample_rate is not None:
         cfg.sample_rate = args.sample_rate
     if args.start_condition is not None:
@@ -768,7 +768,7 @@ def handle_record(args, dl):
             raise DlError(
                 "Start time needs to be set for the selected start condition")
         start_time = parse_time(args.start_time)
-        cfg.start_time = date_time_record_from_datetime(start_time)
+        cfg.start_time = DateTimeRecord.from_datetime(start_time)
     elif args.start_time is not None:
         print("--start-time ignored in the selected start condition")
 
@@ -777,7 +777,7 @@ def handle_record(args, dl):
             raise DlError(
                 "Stop time needs to be set for the selected start condition")
         stop_time = parse_time(args.stop_time)
-        cfg.stop_time = date_time_record_from_datetime(stop_time)
+        cfg.stop_time = DateTimeRecord.from_datetime(stop_time)
     elif args.stop_time is not None:
         print("--stop-time ignored in the selected start condition")
 
