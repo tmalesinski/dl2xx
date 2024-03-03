@@ -242,6 +242,11 @@ class DateTimeRecord(_BinaryRecord):
             hour=self.hour, minute=self.minute, second=self.second)
 
 
+def date_time_record_from_datetime(t):
+    return DateTimeRecord(year=t.year, month=t.month, day=t.day,
+                          hour=t.hour, minute=t.minute, second=t.second)
+
+
 # 59 bytes when read
 class LoggerConfig(_BinaryRecord):
     _fields = [
@@ -272,8 +277,8 @@ class LoggerConfig(_BinaryRecord):
         _Byte("unk18"),
         _Byte("enable_display"),
         _Byte("stop_style"),
-        _Subrecord("unk_time2", DateTimeRecord),
-        _Subrecord("unk_time3", DateTimeRecord),
+        _Subrecord("start_time", DateTimeRecord),
+        _Subrecord("stop_time", DateTimeRecord),
         _Byte("start_delay_mins"),
         _Word("logger_id"),
         _Byte("unk19")]
@@ -556,6 +561,12 @@ def create_parser():
         "--start-condition", dest="start_condition",
         choices=condition_ids(_START_CONDITIONS),
         help="start condition: " + condition_help(_START_CONDITIONS))
+    parser_record.add_argument(
+        "--start-time", dest="start_time",
+        help="Start time (YYYY-MM-DD [HH:MM[:SS]])")
+    parser_record.add_argument(
+        "--stop-time", dest="stop_time",
+        help="Stop time (YYYY-MM-DD [HH:MM[:SS]])")
     parser_measure = subparsers.add_parser("measure")
 
     return parser
@@ -586,9 +597,20 @@ def format_bool(b):
     return "On" if b else "Off"
 
 
+def parse_time(s):
+    for f in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"]:
+        try:
+            return datetime.datetime.strptime(s, f)
+        except ValueError:
+            continue
+    raise DlError("Could not parse time " + s)
+
+
 _START_CONDITIONS = [
     (0, "Immediately until memory full", "immediately"),
     (1, "Start upon keypress", "keypress"),
+    (2, "Start upon start time", "start_time"),
+    (3, "Start/Stop time", "start_stop_time"),
     (4, "Circular", "circular"),
 ]
 
@@ -730,9 +752,8 @@ def handle_config2(dl):
          format_date_format(response.date_format)),
         ("Enable display:", format_bool(response.enable_display)),
         ("Stop style:", stop_style_name(response.stop_style)),
-        # TODO:
-        # ("Unknown (start?) time", format_time(response.unk_time2)),
-        # ("Unknown (stop?) time", format_time(response.unk_time3)),
+        ("Start time", format_time(response.start_time)),
+        ("Stop time", format_time(response.stop_time)),
         ("Start delay:", f"{response.start_delay_mins}m"),
         ("Logger id:", f"{response.logger_id:04}"),
         ("Owner:", format_0term_bytes(owner.owner)),
@@ -746,14 +767,40 @@ def handle_config2(dl):
 
 def handle_record(args, dl):
     cfg = dl.get_logger_config()
-    t = datetime.datetime.now()
-    cfg.time = DateTimeRecord(year=t.year, month=t.month, day=t.day,
-                              hour=t.hour, minute=t.minute, second=t.second)
+    cfg.time = date_time_record_from_datetime(datetime.datetime.now())
     if args.sample_rate is not None:
         cfg.sample_rate = args.sample_rate
     if args.start_condition is not None:
         cfg.start_condition = parse_condition(
             _START_CONDITIONS, args.start_condition)
+
+    c_start_time = parse_condition(_START_CONDITIONS, "start_time")
+    c_start_stop_time = parse_condition(_START_CONDITIONS, "start_stop_time")
+    needs_start_time = cfg.start_condition in [c_start_time, c_start_stop_time]
+    needs_stop_time = (cfg.start_condition == c_start_stop_time)
+
+    if needs_start_time:
+        if args.start_time is None:
+            raise DlError(
+                "Start time needs to be set for the selected start condition")
+        start_time = parse_time(args.start_time)
+        cfg.start_time = date_time_record_from_datetime(start_time)
+    elif args.start_time is not None:
+        print("--start-time ignored in the selected start condition")
+
+    if needs_stop_time:
+        if args.stop_time is None:
+            raise DlError(
+                "Stop time needs to be set for the selected start condition")
+        stop_time = parse_time(args.stop_time)
+        cfg.stop_time = date_time_record_from_datetime(stop_time)
+    elif args.stop_time is not None:
+        print("--stop-time ignored in the selected start condition")
+
+    if needs_start_time and needs_stop_time:
+        if start_time > stop_time:
+            raise DlError("Stop time must not be earlier then start time")
+
     dl.record_full(cfg)
 
 
