@@ -562,6 +562,10 @@ def create_parser():
         choices=condition_ids(_START_CONDITIONS),
         help="start condition: " + condition_help(_START_CONDITIONS))
     parser_record.add_argument(
+        "--stop-style", dest="stop_style",
+        choices=condition_ids(_STOP_STYLES),
+        help="start condition: " + condition_help(_STOP_STYLES))
+    parser_record.add_argument(
         "--start-time", dest="start_time",
         help="Start time (YYYY-MM-DD [HH:MM[:SS]])")
     parser_record.add_argument(
@@ -801,6 +805,9 @@ def handle_record(args, dl):
     if needs_start_time and needs_stop_time:
         if start_time > stop_time:
             raise DlError("Stop time must not be earlier then start time")
+
+    if args.stop_style is not None:
+        cfg.stop_style = parse_condition(_STOP_STYLES, args.stop_style)
 
     dl.record_full(cfg)
 
