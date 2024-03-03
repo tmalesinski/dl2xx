@@ -18,7 +18,7 @@
 # <https://www.gnu.org/licenses/>.
 
 
-import argparse, datetime, os, hid
+import argparse, datetime, os, sys, hid
 
 _VERSION_NOTICE = """dl210th client 0.1
 Copyright (C) 2024 Tomasz Malesinski
@@ -29,6 +29,10 @@ There is NO WARRANTY, to the extent permitted by law."""
 _TIMEOUT = 1000
 
 class DlError(Exception):
+    pass
+
+
+class UserError(DlError):
     pass
 
 
@@ -613,7 +617,7 @@ def parse_time(s):
             return datetime.datetime.strptime(s, f)
         except ValueError:
             continue
-    raise DlError("Could not parse time " + s)
+    raise UserError("could not parse time " + s)
 
 
 _START_CONDITIONS = [
@@ -766,8 +770,8 @@ def handle_record(args, dl):
 
     if needs_start_time:
         if args.start_time is None:
-            raise DlError(
-                "Start time needs to be set for the selected start condition")
+            raise UserError(
+                "start time needs to be set for the selected start condition")
         start_time = parse_time(args.start_time)
         cfg.start_time = DateTimeRecord.from_datetime(start_time)
     elif args.start_time is not None:
@@ -775,8 +779,8 @@ def handle_record(args, dl):
 
     if needs_stop_time:
         if args.stop_time is None:
-            raise DlError(
-                "Stop time needs to be set for the selected start condition")
+            raise UserError(
+                "stop time needs to be set for the selected start condition")
         stop_time = parse_time(args.stop_time)
         cfg.stop_time = DateTimeRecord.from_datetime(stop_time)
     elif args.stop_time is not None:
@@ -784,7 +788,7 @@ def handle_record(args, dl):
 
     if needs_start_time and needs_stop_time:
         if start_time > stop_time:
-            raise DlError("Stop time must not be earlier then start time")
+            raise UserError("stop time must not be earlier than start time")
 
     if args.stop_style is not None:
         cfg.stop_style = parse_condition(_STOP_STYLES, args.stop_style)
@@ -827,4 +831,7 @@ def main():
         dev.close()
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except UserError as e:
+        print("error: " + str(e), file=sys.stderr)
