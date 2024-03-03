@@ -178,6 +178,11 @@ class _BinaryRecord(object):
             res += f.serialized_length()
         return res
 
+    def __setattr__(self, name, value):
+        if not any([f.name == name for f in self._fields]):
+            raise KeyError("unknown field " + name)
+        object.__setattr__(self, name, value)
+
     def __repr__(self):
         res = "<%s " % self.__class__.__name__
         res += ", ".join(
