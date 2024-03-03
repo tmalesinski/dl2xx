@@ -702,34 +702,6 @@ def handle_dump(dl):
 
 
 def handle_config(dl):
-    response = dl.get_basic_config()
-    fields = [
-        ("Sample rate:", format_interval_secs(response.sample_rate)),
-        ("Led flashing interval:",
-         format_interval_secs(response.led_flashing_interval_secs)),
-        ("Start condition:",
-         start_condition_name(response.start_condition)),
-        ("LED alarm:",
-         format_led_alarm(response.led_alarm)),
-        # TODO: add thresholds conditionally? based on what?
-        ("Temperature low alarm:",
-         format_temperature100(response.temp_low_alarm_100)),
-        ("Temperature high alarm:",
-         format_temperature100(response.temp_high_alarm_100)),
-        ("Humidity low alarm:",
-         format_humidity100(response.hum_low_alarm_100)),
-        ("Humidity high alarm:",
-         format_humidity100(response.hum_high_alarm_100)),
-        ("Temperature unit:",
-         format_temp_unit(response.temp_unit)),
-        ("Date format:",
-         format_date_format(response.date_format))
-        ]
-    print_fields(fields)
-
-
-def handle_config2(dl):
-    # TODO: use this instead of handle_config?
     response = dl.get_logger_config()
     owner = dl.get_owner_start_time()
     location = dl.get_location()
@@ -827,8 +799,6 @@ def handle_command(args, dl):
         handle_status(dl)
     elif args.command == "config":
         handle_config(dl)
-    elif args.command == "config2":
-        handle_config2(dl)
     elif args.command == "record":
         handle_record(args, dl)
     elif args.command == "measure":
