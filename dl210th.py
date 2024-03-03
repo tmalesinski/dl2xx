@@ -617,6 +617,7 @@ _START_CONDITIONS = [
 _STOP_STYLES = [
     (0, "None", "none"),
     (1, "Stop button", "button"),
+    (2, "After PDF created", "after_pdf"),
 ]
 
 def condition_name(desc, c):
