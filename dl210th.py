@@ -355,6 +355,8 @@ class Dl210Th(object):
         return StatusRecord.parse(response[1:])
 
     def record_basic(self, basic_config):
+        if not isinstance(basic_config, BasicConfig):
+            raise ValueError("BasicConfig expected")
         response = self._connection.run_command(3, basic_config.serialize())
         if len(response) != 3:
             raise DlError("expected 3 bytes, got %d" % len(response))
@@ -362,6 +364,8 @@ class Dl210Th(object):
             raise DlError("invalid three first bytes: %s" % response[0:3])
 
     def record_full(self, logger_config):
+        if not isinstance(logger_config, LoggerConfig):
+            raise ValueError("LoggerConfig expected")
         response = self._connection.run_command(17, logger_config.serialize())
         if len(response) != 3:
             raise DlError("expected 3 bytes, got %d" % len(response))
