@@ -351,37 +351,24 @@ class Dl210Th(object):
 
     def status(self):
         response = self._connection.run_command(48)
-        if len(response) != 60:
-            raise DlError("expected 60 bytes, got %d" % len(response))
-        if response[0] != 48:
-            raise DlError("expected first reponse byte to be 0x30, got 0x%02x",
-                          response[0])
+        _check_response(response, length=60, prefix=[48])
         return StatusRecord.parse(response[1:])
 
     def record_basic(self, basic_config):
         if not isinstance(basic_config, BasicConfig):
             raise ValueError("BasicConfig expected")
         response = self._connection.run_command(3, basic_config.serialize())
-        if len(response) != 3:
-            raise DlError("expected 3 bytes, got %d" % len(response))
-        if response[0:3] != bytes([0, 0, 3]):
-            raise DlError("invalid three first bytes: %s" % response[0:3])
+        _check_response(response, length=3, prefix=[0, 0, 3])
 
     def record_full(self, logger_config):
         if not isinstance(logger_config, LoggerConfig):
             raise ValueError("LoggerConfig expected")
         response = self._connection.run_command(17, logger_config.serialize())
-        if len(response) != 3:
-            raise DlError("expected 3 bytes, got %d" % len(response))
-        if response[0:3] != bytes([0, 0, 17]):
-            raise DlError("invalid three first bytes: %s" % response[0:3])
+        _check_response(response, length=3, prefix=[0, 0, 17])
 
     def get_basic_config(self):
         response = self._connection.run_command(4)
-        if len(response) != 31:
-            raise DlError("expected 31 bytes, got %d" % len(response))
-        if response[0:3] != bytes([0, 0, 4]):
-            raise DlError("invalid three first bytes: %s" % response[0:3])
+        _check_response(response, length=31, prefix=[0, 0, 4])
         return BasicConfig.parse(response[3:])
 
     def read_sensors(self):
@@ -401,10 +388,7 @@ class Dl210Th(object):
         
     def get_settings34(self):
         response = self._connection.run_command(34)
-        if len(response) != 56:
-            raise DlError("expected 56 bytes, got %d" % len(response))
-        if response[0] != 34:
-            raise DlError("invalid first bytes: %d" % response[0])
+        _check_response(response, length=56, prefix=[34])
         return response[1:]
         
     def get_owner_start_time(self):
