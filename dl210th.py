@@ -537,6 +537,7 @@ def read_measurements(dl):
 
     time = state.time.to_datetime()
     sample_rate = datetime.timedelta(seconds=state.sample_rate)
+    print("time,temperature,humidity")
     for b in blocks:
         for m in b.measurements:
             print(time.strftime("%Y-%m-%d %H:%M:%S") +
