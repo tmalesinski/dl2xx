@@ -692,6 +692,8 @@ def handle_status(dl):
         ("Current time:", format_time(s.time)),
         ("Firmware version:", format_bytes(s.firmware_version)),
         ("Serial number:", format_bytes(s.serial_number)),
+        ("Unknown (battery level?):", s.unknown1),
+        ("Unknown (recording state?):", s.unknown2),
     ])
 
 
