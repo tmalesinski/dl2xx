@@ -267,7 +267,7 @@ class LoggerConfig(_BinaryRecord):
         _Byte("temp_unit"),
         _Byte("unk15"),
         _Byte("unk16"),
-        _Subrecord("unk_time1", DateTimeRecord),
+        _Subrecord("time", DateTimeRecord),
         _Byte("date_format"),
         _Byte("unk18"),
         _Byte("enable_display"),
@@ -349,6 +349,13 @@ class Dl210Th(object):
         if len(response) != 3:
             raise DlError("expected 3 bytes, got %d" % len(response))
         if response[0:3] != bytes([0, 0, 3]):
+            raise DlError("invalid three first bytes: %s" % response[0:3])
+
+    def record_full(self, logger_config):
+        response = self._connection.run_command(17, logger_config.serialize())
+        if len(response) != 3:
+            raise DlError("expected 3 bytes, got %d" % len(response))
+        if response[0:3] != bytes([0, 0, 17]):
             raise DlError("invalid three first bytes: %s" % response[0:3])
 
     def get_basic_config(self):
@@ -738,16 +745,16 @@ def handle_config2(dl):
 
 
 def handle_record(args, dl):
-    s = dl.get_basic_config()
+    cfg = dl.get_logger_config()
     t = datetime.datetime.now()
-    s.time = DateTimeRecord(year=t.year, month=t.month, day=t.day,
-                            hour=t.hour, minute=t.minute, second=t.second)
+    cfg.time = DateTimeRecord(year=t.year, month=t.month, day=t.day,
+                              hour=t.hour, minute=t.minute, second=t.second)
     if args.sample_rate is not None:
-        s.sample_rate = args.sample_rate
+        cfg.sample_rate = args.sample_rate
     if args.start_condition is not None:
-        s.start_condition = parse_condition(
+        cfg.start_condition = parse_condition(
             _START_CONDITIONS, args.start_condition)
-    dl.record_basic(s)
+    dl.record_full(cfg)
 
 
 def handle_measure(dl):
