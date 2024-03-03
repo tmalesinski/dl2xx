@@ -454,9 +454,6 @@ class Dl210Th(object):
         self._connection.send_command(1)
         n = 1
         data = []
-        # TODO: verify that all blocks are read
-        # TODO: read start time and check that there were no new entries
-        # in between to have correct start time.
         while True:
             r = self._connection.read_response()
             if not r: break
