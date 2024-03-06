@@ -688,11 +688,13 @@ def print_fields(fields):
 
 def handle_status(dl):
     s = dl.status()
+    c = dl.get_basic_config()
     print_fields([
         ("Device type:", format_bytes(s.device_type)),
         ("Current time:", format_time(s.time)),
         ("Firmware version:", format_bytes(s.firmware_version)),
         ("Serial number:", format_bytes(s.serial_number)),
+        ("Data count:", c.data_count),
         ("Unknown (battery level?):", s.unknown1),
         ("Unknown (recording state?):", s.unknown2),
     ])
