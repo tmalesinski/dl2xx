@@ -473,12 +473,13 @@ class Dl210Th(object):
 
 
 def _try_read_measurements(dl):
-    state_before = dl.get_basic_config()
+    config_before = dl.get_basic_config()
+    owner_before = dl.get_owner_start_time()
     blocks = dl.dump_data()
 
     per_block = 15
-    expected_blocks = (state_before.data_count + (per_block - 1)) // per_block
-    expected_in_last = state_before.data_count % per_block
+    expected_blocks = (config_before.data_count + (per_block - 1)) // per_block
+    expected_in_last = config_before.data_count % per_block
     if expected_in_last == 0:
         expected_in_last = per_block
 
@@ -497,20 +498,25 @@ def _try_read_measurements(dl):
         if b is None or len(b.measurements) < per_block:
             result[i] = dl.get_data_block(i + 1)
 
-    state_after = dl.get_basic_config()
+    # TODO: with two requests we can have inconsistent data_count and start_time
+    # does it matter? Can we somehow read the two in a way that ensures
+    # consistency?
+    config_after = dl.get_basic_config()
+    owner_after = dl.get_owner_start_time()
 
     # TODO: handle invalid start dates?
-    if ((state_before.data_count != state_after.data_count) or
-        (state_before.time.to_datetime() != state_after.time.to_datetime())):
+    if ((config_before.data_count != config_after.data_count) or
+        (owner_before.start_time.to_datetime() !=
+         owner_after.start_time.to_datetime())):
         raise DlError(f"data item added while dumping")
 
-    return result, state_after
+    return result, config_after, owner_after.start_time
 
 def read_measurements(dl):
     num_retries = 5
     while True:
         try:
-            blocks, state = _try_read_measurements(dl)
+            blocks, config, start_time = _try_read_measurements(dl)
         except DlError as e:
             num_retries -= 1
             if num_retries >= 0:
@@ -519,8 +525,8 @@ def read_measurements(dl):
         else:
             break
 
-    time = state.time.to_datetime()
-    sample_rate = datetime.timedelta(seconds=state.sample_rate)
+    time = start_time.to_datetime()
+    sample_rate = datetime.timedelta(seconds=config.sample_rate)
     print("time,temperature,humidity")
     for b in blocks:
         for m in b.measurements:
